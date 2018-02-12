@@ -1,1 +1,27 @@
-Curiosity-driven Exploration for Reinforcement Learning
+Project: Curiosity-driven Exploration for Reinforcement Learning
+
+Link to paper overview: 
+http://openaccess.thecvf.com/content_cvpr_2017_workshops/w5/papers/Pathak_Curiosity-Driven_Exploration_by_CVPR_2017_paper.pdf
+
+Problem: sparse rewards making learning optimal policy difficult.
+
+General idea: Augment reward function with intrinsic reward based on the agent's difficulty predicting 
+next state given current state and executed action. 
+
+Key insight: only predict environment changes that are due actions of agent or affect agent. 
+--> Make predictions in feature space that only captures relevant information.
+--> Learn feature space using self-supervision; 
+train neural network on proxy inverse dynamics task of predicting agent's actions given current and next state.
+--> Feature space is then used to train forward dynamics model that predicts feature representation of next state (given current state and action).
+--> Intrinsic reward is defined in term of prediction error of the forward dynamics model. 
+--> This encourages curiosity.   
+
+Two subsystems at work: 1. reward generator 
+                        2. policy that outputs sequence of actions to maximize reward signal.   
+                            A. Policy represented by deep neural network.
+
+Intrinsic Curiosity Module + Asynchronous Advantage Actor Critic Policy Gradient (A3C).
+
+
+TODO:
+Create the VizDoom environment.
