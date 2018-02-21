@@ -20,6 +20,7 @@ import shutil
 import matplotlib.pyplot as plt
 
 GAME = 'Pendulum-v0'
+#GAME = 'MountainCarContinuous-v0'
 OUTPUT_GRAPH = True
 LOG_DIR = './log'
 N_WORKERS = multiprocessing.cpu_count()
@@ -39,7 +40,6 @@ env = gym.make(GAME)
 N_S = env.observation_space.shape[0]
 N_A = env.action_space.shape[0]
 A_BOUND = [env.action_space.low, env.action_space.high]
-
 
 class ACNet(object):
     def __init__(self, scope, globalAC=None):
@@ -204,4 +204,12 @@ if __name__ == "__main__":
     plt.xlabel('step')
     plt.ylabel('Total moving reward')
     plt.show()
+
+    # Render the results of the learned policy
+    s = env.reset()
+    for ep_t in range(2000):
+        a = workers[0].AC.choose_action(s)
+        env.render() 
+        s, r, done, info = env.step(a)
+        done = True if ep_t == MAX_EP_STEP - 1 else False
 
