@@ -6,10 +6,13 @@ import torch.nn.functional as F
 from torch.optim import Adam
 import gym
 import gym_maze
+import sys
+import time
 
 class ReplayMemory:
     # capacity is approximately 100MB
-    def __init__(self, size=27000, shape=(10, 10, 9)):
+    # def __init__(self, size=27000, shape=(10, 10, 9)):
+    def __init__(self, size=27000, shape=(10, 10)):
         self.size  = size
         self.reward = np.zeros(size)
         self.first_state = np.zeros((size,) + shape)
@@ -19,8 +22,10 @@ class ReplayMemory:
         self.full = False
 
     def push(self, first_state, action, reward, second_state):
-        self.first_state[self.position, :,:,:] = first_state
-        self.second_state[self.position, :,:,:] = second_state
+        # self.first_state[self.position, :,:,:] = first_state
+        # self.second_state[self.position, :,:,:] = second_state
+        self.first_state[self.position, :,:] = first_state
+        self.second_state[self.position, :,:] = second_state
         self.action[self.position] = action
         self.reward[self.position] = reward
         self.position = (self.position + 1) % self.size
@@ -32,6 +37,10 @@ class ReplayMemory:
         return self.first_state[ind], self.action[ind], \
             self.reward[ind], self.second_state[ind]
 
+    def last(self):
+        return self.first_state[self.position-1], self.action[self.position-1], \
+            self.reward[self.position-1], self.second_state[self.position-1]
+
     def __len__(self):
         if self.full:
             return self.size
@@ -41,21 +50,25 @@ class ReplayMemory:
 class DQN(nn.Module):
     def __init__(self):
         super(DQN, self).__init__()
-        self.conv1 = nn.Conv2d(9, 32, kernel_size=3)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=5)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3)
-        self.bn3 = nn.BatchNorm2d(128)
-        self.conv4 = nn.Conv2d(128, 1, kernel_size=1)
+        self.lin = nn.Linear(100, 4)
+        # self.conv1 = nn.Conv2d(1, 32, kernel_size=3)
+        # self.bn1 = nn.BatchNorm2d(32)
+        # self.conv2 = nn.Conv2d(32, 64, kernel_size=5)
+        # self.bn2 = nn.BatchNorm2d(64)
+        # self.conv3 = nn.Conv2d(64, 128, kernel_size=3)
+        # self.bn3 = nn.BatchNorm2d(128)
+        # self.conv4 = nn.Conv2d(128, 1, kernel_size=1)
 
     def forward(self, x):
-        x = x.permute(0, 3, 1, 2)
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = F.relu(self.bn3(self.conv3(x)))
-        x = self.conv4(x)
-        return x.view(x.size(0), -1)
+        x = self.lin(x.view(x.size(0), -1))
+        return x.view(x.size(0), 4)
+
+        # x = x.permute(0, 3, 1, 2)
+        # x = F.relu(self.bn1(self.conv1(x)))
+        # x = F.relu(self.bn2(self.conv2(x)))
+        # x = F.relu(self.bn3(self.conv3(x)))
+        # x = self.conv4(x)
+        # return x.view(x.size(0), -1)
 
 def select_action(model, state):
     # start with e-greedy
@@ -65,32 +78,38 @@ def select_action(model, state):
     else:
         return np.random.randint(4)
 
-
-env = gym.make('maze-random-10x10-v0')
+np.random.seed(10)
+env = gym.make('milestone-maze-v0')
 dqn = DQN().train()
 optimizer = Adam(dqn.parameters())
-batch_size = 10
+batch_size = 1000
 gamma = 0.99
 memory = ReplayMemory()
+
+episode_steps = []
 
 num_episodes = 50
 for i_episode in range(num_episodes):
     state = env.reset()
     t = 0
     done = False
-    print('done')
+    total_reward = 0
 
-    while not done and t < 100:
+    while not done and t < 2000:
         # acting
-        state_variable = Variable(torch.from_numpy(state[np.newaxis,:,:,:].astype('float32')))
+        state_variable = Variable(torch.from_numpy(state[np.newaxis,:,:].astype('float32')))
+
+        # state_variable = Variable(torch.from_numpy(state[np.newaxis,:,:,:].astype('float32')))
         action = select_action(dqn, state_variable)
         next_state, reward, done, _ = env.step(action)
-        memory.push(state, action, reward, next_state)
-        state = next_state
-        env.render()
 
+        total_reward += reward * gamma ** t
+        memory.push(state, action, reward, next_state)
+        state = np.copy(next_state)
+            # env.render()
         # training
         state_batch, action_batch, reward_batch, next_state_batch = memory.sample(batch_size)
+
         action_batch = action_batch.reshape(batch_size,1)
         state_batch = Variable(torch.from_numpy(state_batch.astype('float32')))
         action_batch = Variable(torch.from_numpy(action_batch.astype('int64')))
@@ -100,10 +119,19 @@ for i_episode in range(num_episodes):
         state_action_values = dqn(state_batch).gather(1, action_batch)
 
         expected_state_action_values = (next_state_values * gamma) + reward_batch
-        loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
+
+        loss = F.smooth_l1_loss(state_action_values, expected_state_action_values.detach())
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        t += 1
+    episode_steps.append(t)
 
+    print('done', t, 'steps', total_reward, 'reward')
+
+import matplotlib.pyplot as plt
+
+plt.plot(episode_steps)
+plt.savefig('/Users/user/Desktop/foo.png')
 # dqn = DQN()
 # dqn(Variable(torch.from_numpy(np.zeros((1,10,10,9), dtype='float32'))))
