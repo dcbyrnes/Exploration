@@ -64,7 +64,7 @@ class CoreNet(nn.Module):
         x = self.conv2(x)
         x = self.relu2(x)
         x = self.bn2(x)
-        return x.view(x.size(0), 100)
+        return x
 
 class HeadNet(nn.Module):
     def __init__(self, core):
@@ -74,7 +74,7 @@ class HeadNet(nn.Module):
 
     def forward(self, x):
         x = self.core(x)
-        x = self.lin(x)
+        x = self.lin(x.view(x.size(0), 100))
         return x.view(x.size(0), -1)
 
 def select_action(model, state):
@@ -88,7 +88,7 @@ def select_action(model, state):
 np.random.seed(10)
 torch.manual_seed(7)
 
-num_models = 10
+num_models = 100
 num_episodes = 200
 
 envs = [gym.make('small-maze-{}-v0'.format(i)) for i in range(num_models)]
@@ -175,5 +175,7 @@ for i_episode in range(num_episodes):
         core_optimizer.zero_grad()
         loss.backward()
         core_optimizer.step()
+
+    torch.save(core.state_dict(), 'teststate')
 
 print(episode_history)
