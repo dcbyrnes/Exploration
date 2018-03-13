@@ -12,7 +12,7 @@ import time
 class ReplayMemory:
     # capacity is approximately 100MB
     # def __init__(self, size=27000, shape=(10, 10, 9)):
-    def __init__(self, size=5000, shape=(5, 5, 8)):
+    def __init__(self, size=400, shape=(5, 5, 8)):
         self.size  = size
         self.reward = np.zeros(size)
         self.first_state = np.zeros((size,) + shape)
@@ -49,20 +49,28 @@ class ReplayMemory:
 class CoreNet(nn.Module):
     def __init__(self):
         super(CoreNet, self).__init__()
-        self.conv1 = nn.Conv2d(8, 8, kernel_size=3, stride=1, padding=1)
-        self.bn1 = nn.BatchNorm2d(8)
+        self.conv1 = nn.Conv2d(8, 32, kernel_size=3, stride=1, padding=1)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 4, kernel_size=3, stride=1, padding=1)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.bn2 = nn.BatchNorm2d(4)
 
     def forward(self, x):
         x = x.permute(0, 3, 1, 2)
         x = self.conv1(x)
+        x = self.relu1(x)
         x = self.bn1(x)
-        return x.view(x.size(0), 200)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.bn2(x)
+        return x.view(x.size(0), 100)
 
 class HeadNet(nn.Module):
     def __init__(self, core):
         super(HeadNet, self).__init__()
         self.core = core
-        self.lin = nn.Linear(200, 4)
+        self.lin = nn.Linear(100, 4)
 
     def forward(self, x):
         x = self.core(x)
@@ -80,7 +88,7 @@ def select_action(model, state):
 np.random.seed(10)
 torch.manual_seed(7)
 
-num_models = 10
+num_models = 40
 envs = [gym.make('small-maze-{}-v0'.format(i)) for i in range(num_models)]
 mems = [ReplayMemory() for i in range(num_models)]
 core = CoreNet()
@@ -88,16 +96,16 @@ mods = [HeadNet(core) for i in range(num_models)]
 opts = [Adam(mod.parameters()) for mod in mods]
 last_state = [env.reset() for env in envs]
 total_rewards = [0 for i in range(num_models)]
-episode_steps = [0 for i in range(num_models)]
+episode_steps = [1 for i in range(num_models)]
 episode_count = [0 for i in range(num_models)]
 episode_history = {k:[] for k in range(num_models)}
 
-total_training_steps = 2500
+total_training_steps = 4000
 max_steps_per_episode = 300
 batch_size = 10
 gamma = 0.99
 
-for _ in range(total_training_steps):
+for t in range(total_training_steps):
     for i in range(num_models):
         
         # set things for particular model
@@ -112,31 +120,35 @@ for _ in range(total_training_steps):
         action = select_action(model, state_variable)
         next_state, reward, done, _ = env.step(action)
         memory.push(state, action, reward, next_state)
+        
 
-        # train
-        state_batch, action_batch, reward_batch, next_state_batch = memory.sample(batch_size)
-        action_batch = action_batch.reshape(batch_size,1)
-        state_batch = Variable(torch.from_numpy(state_batch.astype('float32')))
-        action_batch = Variable(torch.from_numpy(action_batch.astype('int64')))
-        reward_batch = Variable(torch.from_numpy(reward_batch.astype('float32')))
-        next_state_batch = Variable(torch.from_numpy(next_state_batch.astype('float32')))
-        next_state_values = model(next_state_batch).max(1)[0]
-        state_action_values = model(state_batch).gather(1, action_batch)
-        expected_state_action_values = (next_state_values * gamma) + reward_batch
+        if episode_history[i] and episode_history[i][-1] >= 3:
+        
+            # train
+            state_batch, action_batch, reward_batch, next_state_batch = memory.sample(batch_size)
+            action_batch = action_batch.reshape(batch_size,1)
+            state_batch = Variable(torch.from_numpy(state_batch.astype('float32')))
+            action_batch = Variable(torch.from_numpy(action_batch.astype('int64')))
+            reward_batch = Variable(torch.from_numpy(reward_batch.astype('float32')))
+            next_state_batch = Variable(torch.from_numpy(next_state_batch.astype('float32')))
+            next_state_values = model(next_state_batch).max(1)[0]
+            state_action_values = model(state_batch).gather(1, action_batch)
+            expected_state_action_values = (next_state_values * gamma) + reward_batch
 
-        loss = F.smooth_l1_loss(state_action_values, expected_state_action_values.detach())
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            loss = F.smooth_l1_loss(state_action_values, expected_state_action_values.detach())
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
         # handle done
         # set things for model
         if done or episode_steps[i] >= max_steps_per_episode:
             total_rewards[i] += reward * gamma ** episode_steps[i]
             episode_history[i].append(episode_steps[i])
-            print('Agent {} finished episode {} in {} steps and {} reward.'
+            if (episode_steps[i] > 2):
+                print('Agent {} finished episode {} in {} steps and {} reward.'
                 .format(i, episode_count[i], episode_steps[i], total_rewards[i]))
-            episode_steps[i] = 0
+            episode_steps[i] = 1
             total_rewards[i] = 0
             episode_count[i] += 1
             last_state[i] = env.reset()
