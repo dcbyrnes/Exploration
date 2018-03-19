@@ -182,6 +182,6 @@ def actor_critic(episodes=100, gamma=0.95, display=False, lamb=1e-5, policy_lr=0
 
 if __name__ == "__main__":
     policy_lr, value_lr, lamb, gamma = [0.0001, 0.00046415888336127773, 2.782559402207126e-05, 0.98999999999999999]
-    loss = actor_critic(episodes=20, gamma=gamma, display=False, lamb=lamb, policy_lr=policy_lr, value_lr=value_lr)
+    loss = actor_critic(episodes=1000, gamma=gamma, display=False, lamb=lamb, policy_lr=policy_lr, value_lr=value_lr)
     print(-loss)
     env.close()

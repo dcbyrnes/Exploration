@@ -24,10 +24,10 @@ def exec_time(func):
 
 env = gym.envs.make("LunarLanderContinuous-v2")
 
-video_dir = os.path.abspath("./videos/LunarLander")
-if not os.path.exists(video_dir):
-    os.makedirs(video_dir)
-env = gym.wrappers.Monitor(env, video_dir, force=True)
+# video_dir = os.path.abspath("./videos/LunarLander")
+# if not os.path.exists(video_dir):
+    # os.makedirs(video_dir)
+# env = gym.wrappers.Monitor(env, video_dir, force=True)
 
 def process_state(state):
     return state

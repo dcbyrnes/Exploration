@@ -75,12 +75,12 @@ def select_action(model, state):
 
 np.random.seed(10)
 envs = [gym.make('small-maze-{}-v0'.format(i)) for i in range(10)]
+mems = [ReplayMemory() for i in range(10)]
 
 dqn = DQN().train()
 optimizer = Adam(dqn.parameters())
-batch_size = 100
+batch_size = 10
 gamma = 0.99
-memory = ReplayMemory()
 
 episode_steps = []
 
@@ -124,13 +124,12 @@ for i_episode in range(num_episodes):
         loss.backward()
         optimizer.step()
         t += 1
-    episode_steps.append(t)
 
     print('done', t, 'steps', total_reward, 'reward')
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
-plt.plot(episode_steps)
-plt.savefig('/Users/user/Desktop/foo.png')
+# plt.plot(episode_steps)
+# plt.savefig('/Users/user/Desktop/foo.png')
 # dqn = DQN()
 # dqn(Variable(torch.from_numpy(np.zeros((1,10,10,9), dtype='float32'))))

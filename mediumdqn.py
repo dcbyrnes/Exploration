@@ -112,8 +112,9 @@ class LinearBaselineNet(nn.Module):
         
     def forward(self, x):
         x = x.permute(0, 3, 1, 2)
+        x = x.contiguous()
         x = self.lin(x.view(x.size(0), 800))
-        return x.view(x.size(0), -1)
+        return x.view(x.size(0), 4)
 
 def select_action(model, state):
     # start with e-greedy
@@ -130,17 +131,17 @@ env = gym.make('medium-maze-3-v0')
 memory = ReplayMemory(size=2000, shape=(10,10,8))
 
 # proposed method
-core = CoreNet()
-core.load_state_dict(torch.load('teststate'))
-model = MediumNet(core)
-params = list(model.conv1.parameters()) + list(model.lin1.parameters()) + list(model.relu1.parameters())
- # + list(model.bn1.parameters())
-optimizer = Adam(params)
+# core = CoreNet()
+# core.load_state_dict(torch.load('teststate'))
+# model = MediumNet(core)
+# params = list(model.conv1.parameters()) + list(model.lin1.parameters()) + list(model.relu1.parameters())
+#  # + list(model.bn1.parameters())
+# optimizer = Adam(params)
 
 # baseline
 # core = CoreNet()
-# model = MediumNet(core)
-# optimizer = Adam(model.parameters())
+model = LinearBaselineNet()
+optimizer = Adam(model.parameters())
 
 num_episodes = 500
 max_steps_per_episode = 500
@@ -182,5 +183,5 @@ for i_episode in range(num_episodes):
     
     if i_episode % 10 == 0:
         # torch.save(core.state_dict(), 'medstate_proposed')
-        torch.save(core.state_dict(), 'medstate_baseline')
+        # torch.save(core.state_dict(), 'medstate_baseline')
 
